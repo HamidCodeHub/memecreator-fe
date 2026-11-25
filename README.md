@@ -44,6 +44,21 @@ which forwards the same paths to Spring Boot. See the "Deploying Memes for Laugh
 | `public/terms.html`, `privacy.html`, `data-deletion.html`, `legal.css` | legal pages, **drafts for legal review** |
 | `public/logo.svg`, `favicon.svg` | the logo (also inlined in `src/Logo.tsx`) |
 
+## Languages
+
+The site is in English by default; the switch in the header (EN / IT) changes it, and the choice is remembered in
+`localStorage` (`lang`). The site name and the logo never change. The meme captions are written in the site's
+language unless the person picks another one under "Caption language".
+
+- Every text is in `src/messages.tsx`: `en` and `it`, with the same shape (TypeScript reports a missing text).
+  Components read them with `const { t } = useI18n()`, e.g. `t.generator.make`.
+- To add a language: copy `it` into a new object, translate it, and add it to `LANGUAGES` in `src/i18n.tsx`.
+- The backend writes its error messages in English. On the English site they are shown as they are; in other
+  languages the site shows its own translated message for that case (`src/errors.ts`). Requests carry
+  `Accept-Language`, so the backend can translate later.
+- Not translated yet: the legal pages (`public/*.html`, still drafts for legal review) and the emails the backend
+  sends.
+
 ## Legal pages and the terms version
 
 When you change `terms.html` or `privacy.html`, change the version date in the pages **and**

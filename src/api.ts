@@ -1,3 +1,5 @@
+import { currentLang, currentMessages } from './i18n'
+
 // Calls to the memecreator backend. Same origin (Vite proxy in development), session cookie set by the
 // backend after Google/Facebook sign-in. Changing requests carry the CSRF token from the XSRF-TOKEN cookie.
 
@@ -102,6 +104,7 @@ function csrfToken(): string | null {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
+  headers.set('Accept-Language', currentLang())
   if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   const method = (init.method ?? 'GET').toUpperCase()
   if (method !== 'GET') {
@@ -113,7 +116,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await fetch(path, { ...init, headers, credentials: 'same-origin' })
   } catch {
-    throw new ApiError(0, 'Can’t reach Memes for Laughs. Check your connection and try again.')
+    throw new ApiError(0, currentMessages().common.offline)
   }
   if (response.status === 204) return undefined as T
   if (!response.ok) {
@@ -143,12 +146,12 @@ export async function fetchMe(): Promise<User | null> {
 
 export const fetchProviders = () => request<Provider[]>('/api/web/providers')
 
-/** @param template a template id: all memes use it; null lets the AI pick the templates */
 export const fetchPlan = () => request<PlanInfo>('/api/web/plan')
 
 /** Fired after each set and on the daily limit, so every page showing the plan can refresh it. */
 export const PLAN_CHANGED = 'memecreator:plan-changed'
 
+/** @param template a template id: all memes use it; null lets the AI pick the templates */
 export const makeMemes = (topic: string, language: string, template: string | null = null) =>
   request<MemeSet>('/api/web/memes', { method: 'POST', body: JSON.stringify({ topic, language, template }) })
 
@@ -240,7 +243,11 @@ export const fetchEditInfo = (url: string) => request<EditInfo>(`/api/web/edits?
 
 /** The meme with other words, as an image (nothing saved). */
 export async function previewEdit(url: string, texts: string[], signal?: AbortSignal): Promise<Blob> {
-  const headers = new Headers({ 'Content-Type': 'application/json', Accept: 'image/jpeg, application/json' })
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    Accept: 'image/jpeg, application/json',
+    'Accept-Language': currentLang(),
+  })
   const token = csrfToken()
   if (token) headers.set('X-XSRF-TOKEN', token)
   let response: Response
@@ -254,7 +261,7 @@ export async function previewEdit(url: string, texts: string[], signal?: AbortSi
     })
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e
-    throw new ApiError(0, 'Can’t reach Memes for Laughs. Check your connection and try again.')
+    throw new ApiError(0, currentMessages().common.offline)
   }
   if (!response.ok) {
     let detail = ''

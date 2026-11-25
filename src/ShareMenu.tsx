@@ -1,7 +1,9 @@
 import { Check, Download, Globe, Link2, Share2 } from 'lucide-react'
 import { siFacebook, siInstagram, siTelegram, siWhatsapp, siX, type SimpleIcon } from 'simple-icons'
 import { useEffect, useId, useRef, useState } from 'react'
-import { ApiError, shareMeme, type Meme, type Share } from './api'
+import { shareMeme, type Meme, type Share } from './api'
+import { serverText } from './errors'
+import { useI18n } from './i18n'
 
 function BrandIcon({ icon }: { icon: SimpleIcon }) {
   return (
@@ -27,6 +29,7 @@ export function ShareMenu({ meme, fileName }: { meme: Meme; fileName: string }) 
   const menuId = useId()
   const open = state.kind !== 'closed'
   const text = meme.texts.filter(Boolean).join(' / ')
+  const { t, lang } = useI18n()
 
   useEffect(() => {
     if (!open) return
@@ -78,7 +81,7 @@ export function ShareMenu({ meme, fileName }: { meme: Meme; fileName: string }) 
     } catch (e) {
       setState({
         kind: 'error',
-        message: e instanceof ApiError && e.message ? e.message : 'Couldn’t get a link for this meme. Try again.',
+        message: serverText(e, lang, t.share.failed),
       })
     }
   }
@@ -98,7 +101,7 @@ export function ShareMenu({ meme, fileName }: { meme: Meme; fileName: string }) 
       await navigator.clipboard.writeText(s.pageUrl)
       setCopied(true)
     } catch {
-      window.prompt('Copy this link:', s.pageUrl)
+      window.prompt(t.share.copyPrompt, s.pageUrl)
     }
   }
 
@@ -116,8 +119,8 @@ export function ShareMenu({ meme, fileName }: { meme: Meme; fileName: string }) 
         ref={button}
         type="button"
         className="icon-button"
-        aria-label="Share"
-        title="Share"
+        aria-label={t.share.share}
+        title={t.share.share}
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={toggle}
@@ -125,8 +128,8 @@ export function ShareMenu({ meme, fileName }: { meme: Meme; fileName: string }) 
         <Share2 size={20} aria-hidden="true" />
       </button>
       {open && (
-        <div id={menuId} className="share-menu" role="group" aria-label="Share this meme">
-          {state.kind === 'loading' && <p className="share-status">Getting a link…</p>}
+        <div id={menuId} className="share-menu" role="group" aria-label={t.share.group}>
+          {state.kind === 'loading' && <p className="share-status">{t.share.gettingLink}</p>}
           {state.kind === 'error' && (
             <p className="share-status share-error" role="alert">
               {state.message}
@@ -142,7 +145,7 @@ export function ShareMenu({ meme, fileName }: { meme: Meme; fileName: string }) 
                   onClick={() => nativeShare(state.share, state.file)}
                 >
                   <Share2 size={18} aria-hidden="true" />
-                  Share to an app…
+                  {t.share.toApp}
                 </button>
               )}
               {targets(state.share).map((t, i) => (
@@ -161,18 +164,18 @@ export function ShareMenu({ meme, fileName }: { meme: Meme; fileName: string }) 
               ))}
               <button type="button" className="share-item" onClick={() => copy(state.share)}>
                 {copied ? <Check size={18} aria-hidden="true" /> : <Link2 size={18} aria-hidden="true" />}
-                {copied ? 'Link copied' : 'Copy link'}
+                {copied ? t.share.copied : t.share.copy}
               </button>
               <a className="share-item" href={meme.url} download={fileName}>
                 <BrandIcon icon={siInstagram} />
                 <span>
                   Instagram
-                  <small>Save the image, then post it from the app</small>
+                  <small>{t.share.instagramHint}</small>
                 </span>
                 <Download size={16} aria-hidden="true" className="share-item-end" />
               </a>
               <p className="share-note">
-                <Globe size={14} aria-hidden="true" /> Anyone with the link can see this meme.
+                <Globe size={14} aria-hidden="true" /> {t.share.public}
               </p>
             </>
           )}

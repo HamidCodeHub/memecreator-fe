@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchProviders, type Provider, type User } from './api'
 import { CaptionFrame } from './CaptionFrame'
 import { EmailAuth } from './EmailAuth'
+import { useI18n } from './i18n'
 
 // Shown while the provider list loads, so the buttons don't jump in
 const FALLBACK: Provider[] = [
@@ -13,6 +14,7 @@ export type Notice = { kind: 'error' | 'info'; text: string }
 
 export function SignIn({ notice, onSignedIn }: { notice: Notice | null; onSignedIn: (user: User) => void }) {
   const [providers, setProviders] = useState<Provider[]>(FALLBACK)
+  const { t } = useI18n()
 
   useEffect(() => {
     fetchProviders()
@@ -29,15 +31,14 @@ export function SignIn({ notice, onSignedIn }: { notice: Notice | null; onSigned
   return (
     <main className="signin">
       <div className="signin-art">
-        <CaptionFrame top="Type anything" bottom="Get six memes" className="frame-hero" />
+        <CaptionFrame top={t.signIn.artTop} bottom={t.signIn.artBottom} className="frame-hero" />
       </div>
 
       <section className="signin-panel" aria-labelledby="signin-title">
-        <h1 id="signin-title" className="signin-title">Turn one line into six memes</h1>
-        <p className="lede">
-          Write what’s on your mind — a topic, a situation, a feeling. Memes for Laughs picks six templates and writes
-          the captions.
-        </p>
+        <h1 id="signin-title" className="signin-title">
+          {t.signIn.title}
+        </h1>
+        <p className="lede">{t.signIn.lede}</p>
 
         {notice && (
           <p className={`notice notice-${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
@@ -45,30 +46,32 @@ export function SignIn({ notice, onSignedIn }: { notice: Notice | null; onSigned
           </p>
         )}
 
-        <h2 className="panel-title">Sign in to start</h2>
+        <h2 className="panel-title">{t.signIn.start}</h2>
         <div className="provider-list">
           {providers.map((p) =>
             p.configured ? (
               <a key={p.id} className={`provider provider-${p.id}`} href={p.loginUrl}>
-                Continue with {p.label}
+                {t.signIn.continueWith(p.label)}
               </a>
             ) : (
               <span key={p.id} className={`provider provider-${p.id} is-disabled`} aria-disabled="true">
-                Continue with {p.label}
-                <small>Not set up yet</small>
+                {t.signIn.continueWith(p.label)}
+                <small>{t.signIn.notSetUp}</small>
               </span>
             ),
           )}
         </div>
 
         <p className="divider">
-          <span>or with your email</span>
+          <span>{t.signIn.orEmail}</span>
         </p>
         <EmailAuth onSignedIn={onSignedIn} />
 
         <p className="fine-print">
-          Memes for Laughs is for adults (18+). Captions can be rude. Read the <a href="/terms.html">Terms of use</a>{' '}
-          and the <a href="/privacy.html">Privacy policy</a>; you accept them before making your first memes.
+          {t.signIn.finePrint(
+            <a href="/terms.html">{t.common.termsOfUse}</a>,
+            <a href="/privacy.html">{t.common.privacyPolicy}</a>,
+          )}
         </p>
       </section>
     </main>

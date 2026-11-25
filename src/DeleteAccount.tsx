@@ -1,12 +1,14 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError, deleteAccount } from './api'
+import { serverText } from './errors'
+import { useI18n } from './i18n'
 
 /** "Delete my account": a dialog where the person types DELETE. */
 export function DeleteAccount({
   onDeleted,
   onSignedOut,
-  label = 'Delete my account',
+  label,
   variant = 'link',
 }: {
   onDeleted: () => void
@@ -21,6 +23,10 @@ export function DeleteAccount({
   const [error, setError] = useState<string | null>(null)
   const dialog = useRef<HTMLDialogElement>(null)
   const id = useId()
+  const { t, lang } = useI18n()
+  const d = t.deleteAccount
+  // The word to type is in the site's language; the server request is the same either way
+  const word = d.confirmWord
 
   useEffect(() => {
     const d = dialog.current
@@ -39,7 +45,7 @@ export function DeleteAccount({
   async function submit(e: FormEvent) {
     e.preventDefault()
     e.stopPropagation() // the dialog is portaled, but React still bubbles to any form around the button
-    if (typed !== 'DELETE' || busy) return
+    if (typed.trim().toUpperCase() !== word || busy) return
     setBusy(true)
     setError(null)
     try {
@@ -51,14 +57,14 @@ export function DeleteAccount({
         onSignedOut()
         return
       }
-      setError(err instanceof ApiError && err.message ? err.message : 'Your account wasn’t deleted. Try again.')
+      setError(serverText(err, lang, d.failed))
     }
   }
 
   return (
     <>
       <button type="button" className={variant === 'button' ? 'danger' : 'link-button danger-link'} onClick={() => setOpen(true)}>
-        {label}
+        {label ?? d.label}
       </button>
       {createPortal(
         <dialog
@@ -72,14 +78,11 @@ export function DeleteAccount({
         >
           <form onSubmit={submit} className="dialog-body">
             <h2 id={`${id}-title`} className="dialog-title">
-              Delete your account?
+              {d.title}
             </h2>
-            <p>
-              Your account, favorites, API keys, share links and every meme you made here are deleted for good. This can’t be undone.
-              Memes you already downloaded stay on your device.
-            </p>
+            <p>{d.text}</p>
             <div className="field">
-              <label htmlFor={id}>Type DELETE to confirm</label>
+              <label htmlFor={id}>{d.typeToConfirm(word)}</label>
               <input
                 id={id}
                 autoComplete="off"
@@ -96,10 +99,10 @@ export function DeleteAccount({
             )}
             <div className="dialog-actions">
               <button type="button" className="quiet" onClick={close} disabled={busy}>
-                Cancel
+                {t.common.cancel}
               </button>
-              <button type="submit" className="danger" disabled={typed !== 'DELETE' || busy}>
-                {busy ? 'Deleting…' : 'Delete account'}
+              <button type="submit" className="danger" disabled={typed.trim().toUpperCase() !== word || busy}>
+                {busy ? d.deleting : d.button}
               </button>
             </div>
           </form>

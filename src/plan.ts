@@ -26,14 +26,3 @@ export function usePlan(onSignedOut: () => void): PlanInfo | null {
 export function planChanged() {
   window.dispatchEvent(new Event(PLAN_CHANGED))
 }
-
-/** When today's prompts come back (midnight in Italy), on the visitor's clock: "midnight" or e.g. "6:00 PM" */
-export function resetTime(resetsAt: string): string {
-  const d = new Date(resetsAt)
-  if (d.getHours() === 0 && d.getMinutes() === 0) return 'midnight'
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-}
-
-export function promptsWord(n: number): string {
-  return n === 1 ? 'prompt' : 'prompts'
-}

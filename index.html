@@ -7,11 +7,14 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Memes for Laughs</title>
     <script>
-      // Light or dark before the first paint (see src/theme.ts)
+      // Light or dark before the first paint (see src/theme.ts), and the page language
       try {
         var t = localStorage.getItem('theme')
         if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
         document.documentElement.dataset.theme = t
+        // Language (see src/i18n.tsx)
+        var l = localStorage.getItem('lang')
+        if (l === 'it') document.documentElement.lang = l
       } catch (e) {}
     </script>
   </head>

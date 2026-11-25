@@ -2,6 +2,8 @@ import { RotateCcw } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError, fetchEditInfo, previewEdit, saveEdit, type EditInfo, type Meme } from './api'
+import { serverText } from './errors'
+import { useI18n } from './i18n'
 
 const MAX_TEXT = 200
 
@@ -31,6 +33,7 @@ export function EditMeme({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const { t, lang } = useI18n()
 
   useEffect(() => {
     const d = dialog.current
@@ -54,12 +57,9 @@ export function EditMeme({
       .catch((e) => {
         if (e instanceof ApiError && e.status === 401) onSignedOut()
         else
-          setLoadError(
-            e instanceof ApiError && e.status === 404
-              ? 'This meme can’t be edited: it was made before editing was added. Make a new set to edit its memes.'
-              : 'Couldn’t open the editor. Try again.',
-          )
+          setLoadError(e instanceof ApiError && e.status === 404 ? t.edit.notEditable : t.edit.openFailed)
       })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on open, not on a language switch
   }, [open, meme.url, onSignedOut])
 
   // Live preview: half a second after the last change
@@ -76,7 +76,7 @@ export function EditMeme({
         .then((blob) => setPreview(URL.createObjectURL(blob)))
         .catch((e) => {
           if (e instanceof DOMException && e.name === 'AbortError') return
-          if (e instanceof ApiError && e.status === 400 && e.message) setError(e.message)
+          if (e instanceof ApiError && e.status === 400) setError(serverText(e, lang, t.edit.badText))
         })
         .finally(() => setUpdating(false))
     }, 500)
@@ -106,7 +106,10 @@ export function EditMeme({
       onClose()
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) onSignedOut()
-      else setError(err instanceof ApiError && err.message ? err.message : 'Couldn’t save it. Try again.')
+      else
+        setError(
+          serverText(err, lang, err instanceof ApiError && err.status === 400 ? t.edit.badText : t.meme.couldntSave),
+        )
     } finally {
       setSaving(false)
     }
@@ -124,12 +127,12 @@ export function EditMeme({
     >
       <form className="edit-body" onSubmit={save}>
         <h2 id={`${id}-title`} className="dialog-title">
-          Edit the words
+          {t.edit.title}
         </h2>
         <div className="edit-layout">
           <figure className="edit-preview" aria-busy={updating}>
-            <img src={preview ?? meme.url} alt={`${meme.template} meme, as it will look`} />
-            {updating && <span className="edit-updating">Updating preview…</span>}
+            <img src={preview ?? meme.url} alt={t.edit.previewAlt(meme.template)} />
+            {updating && <span className="edit-updating">{t.edit.updating}</span>}
           </figure>
           <div className="edit-fields">
             {loadError && (
@@ -137,11 +140,11 @@ export function EditMeme({
                 {loadError}
               </p>
             )}
-            {!info && !loadError && <p className="empty">Loading…</p>}
+            {!info && !loadError && <p className="empty">{t.common.loading}</p>}
             {info &&
               info.labels.map((label, i) => (
                 <div className="field" key={i}>
-                  <label htmlFor={`${id}-t${i}`}>{label}</label>
+                  <label htmlFor={`${id}-t${i}`}>{t.edit.boxLabel(label)}</label>
                   <textarea
                     id={`${id}-t${i}`}
                     rows={2}
@@ -158,7 +161,7 @@ export function EditMeme({
               ))}
             {info && !atAi && (
               <button type="button" className="link-button back-to-ai" onClick={() => setTexts(info.aiTexts)}>
-                <RotateCcw size={16} aria-hidden="true" /> Back to the AI’s version
+                <RotateCcw size={16} aria-hidden="true" /> {t.edit.back}
               </button>
             )}
             {error && (
@@ -166,15 +169,15 @@ export function EditMeme({
                 {error}
               </p>
             )}
-            <p className="field-hint">Saving adds the edited meme; the original stays as it is.</p>
+            <p className="field-hint">{t.edit.hint}</p>
           </div>
         </div>
         <div className="dialog-actions">
           <button type="button" className="quiet" onClick={onClose} disabled={saving}>
-            Cancel
+            {t.common.cancel}
           </button>
           <button type="submit" className="primary" disabled={!info || !changed || empty || saving}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t.common.saving : t.common.save}
           </button>
         </div>
       </form>

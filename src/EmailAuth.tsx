@@ -1,14 +1,19 @@
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { ApiError, fetchLegal, forgotPassword, resendConfirmation, signIn, signUp, type User } from './api'
+import { serverText } from './errors'
+import { useI18n } from './i18n'
+import type { Messages } from './messages'
 
 type Mode = 'signin' | 'signup' | 'forgot' | 'sent'
 
 const MIN_PASSWORD = 10
 
-function message(e: unknown, fallback: string): string {
+/** The translated text for an error status (used on non-English sites; English shows the server's words). */
+function byStatus(e: unknown, t: Messages, fallback: string): string {
   if (e instanceof ApiError) {
-    if (e.status === 0) return e.message
-    if (e.message) return e.message
+    if (e.status === 401) return t.emailAuth.wrongCredentials
+    if (e.status === 400) return t.emailAuth.checkDetails
+    if (e.status === 429) return t.common.tooManyAttempts
   }
   return fallback
 }
@@ -27,6 +32,7 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
   const [accepted, setAccepted] = useState(false)
   const [termsVersion, setTermsVersion] = useState<string | null>(null)
   const ids = { email: useId(), password: useId(), name: useId(), hint: useId(), terms: useId() }
+  const { t, lang } = useI18n()
 
   // The version the checkbox accepts; fetched when the sign-up form opens
   useEffect(() => {
@@ -75,15 +81,15 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
       } catch (err) {
         if (err instanceof ApiError && err.code === 'EMAIL_NOT_CONFIRMED') {
           setNotConfirmed(true)
-          setError('Confirm your email first: open the link we sent you.')
+          setError(t.emailAuth.confirmFirst)
         } else if (err instanceof ApiError && err.code === 'TERMS_VERSION_CHANGED') {
           setTermsVersion(null) // fetch the new version
           setAccepted(false)
-          setError('The Terms were just updated. Open them again, then tick the box to accept.')
+          setError(t.common.termsUpdated)
         } else if (err instanceof ApiError && err.status === 403) {
-          setError('Your session expired. Reload the page and try again.')
+          setError(t.common.sessionExpired)
         } else {
-          setError(message(err, 'That didn’t work. Try again.'))
+          setError(serverText(err, lang, byStatus(err, t, t.common.failed)))
         }
       }
     })
@@ -96,7 +102,7 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
         setSentFor('resend')
         setMode('sent')
       } catch (err) {
-        setError(message(err, 'Couldn’t send the link. Try again.'))
+        setError(serverText(err, lang, byStatus(err, t, t.emailAuth.couldntSend)))
       }
     })
   }
@@ -104,12 +110,10 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
   if (mode === 'sent') {
     return (
       <div className="email-auth" aria-live="polite">
-        <p className="sent-title">Check your inbox</p>
+        <p className="sent-title">{t.emailAuth.checkInbox}</p>
         <p className="sent-text">
-          {sentFor === 'forgot'
-            ? `If ${email} has an account, we sent a link to choose a new password. It works for 1 hour.`
-            : `We sent a confirmation link to ${email}. Open it to finish creating your account.`}{' '}
-          Nothing there? Check your spam folder.
+          {sentFor === 'forgot' ? t.emailAuth.sentReset(email) : t.emailAuth.sentConfirm(email)}{' '}
+          {t.emailAuth.checkSpam}
         </p>
         {error && (
           <p className="field-error" role="alert">
@@ -119,37 +123,37 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
         <div className="auth-links">
           {sentFor !== 'forgot' && (
             <button type="button" className="link-button" onClick={resend} disabled={busy}>
-              Send the link again
+              {t.emailAuth.sendAgain}
             </button>
           )}
           <button type="button" className="link-button" onClick={() => go('signin')}>
-            Back to sign in
+            {t.emailAuth.backToSignIn}
           </button>
         </div>
       </div>
     )
   }
 
-  const title = mode === 'signin' ? 'Sign in with email' : mode === 'signup' ? 'Create an account' : 'Forgot your password?'
-  const action =
-    mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'
+  const ea = t.emailAuth
+  const title = mode === 'signin' ? ea.titleSignIn : mode === 'signup' ? ea.titleSignUp : ea.titleForgot
+  const action = mode === 'signin' ? ea.actionSignIn : mode === 'signup' ? ea.actionSignUp : ea.actionForgot
 
   return (
     <form className="email-auth" onSubmit={submit} noValidate>
       <p className="auth-title">{title}</p>
-      {mode === 'forgot' && <p className="auth-help">We’ll email you a link to choose a new password.</p>}
+      {mode === 'forgot' && <p className="auth-help">{ea.forgotHelp}</p>}
 
       {mode === 'signup' && (
         <div className="field">
           <label htmlFor={ids.name}>
-            Name <span className="optional">(optional)</span>
+            {ea.name} <span className="optional">{t.common.optional}</span>
           </label>
           <input id={ids.name} autoComplete="name" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />
         </div>
       )}
 
       <div className="field">
-        <label htmlFor={ids.email}>Email</label>
+        <label htmlFor={ids.email}>{ea.email}</label>
         <input
           id={ids.email}
           type="email"
@@ -164,7 +168,7 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
       {mode !== 'forgot' && (
         <div className="field">
           <div className="field-head">
-            <label htmlFor={ids.password}>Password</label>
+            <label htmlFor={ids.password}>{ea.password}</label>
             <button
               type="button"
               className="link-button small"
@@ -172,7 +176,7 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
               aria-pressed={showPassword}
               onClick={() => setShowPassword((v) => !v)}
             >
-              {showPassword ? 'Hide' : 'Show'}
+              {showPassword ? t.common.hide : t.common.show}
             </button>
           </div>
           <input
@@ -188,7 +192,7 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
           />
           {mode === 'signup' && (
             <p id={ids.hint} className="field-hint">
-              At least {MIN_PASSWORD} characters. A short sentence is easy to remember.
+              {ea.passwordHint(MIN_PASSWORD)}
             </p>
           )}
         </div>
@@ -198,15 +202,14 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
         <label className="check" htmlFor={ids.terms}>
           <input id={ids.terms} type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
           <span>
-            I’m 18 or older and I accept the{' '}
-            <a href="/terms.html" target="_blank" rel="noopener">
-              Terms of use
-            </a>{' '}
-            and the{' '}
-            <a href="/privacy.html" target="_blank" rel="noopener">
-              Privacy policy
-            </a>
-            .
+            {t.common.acceptTerms(
+              <a href="/terms.html" target="_blank" rel="noopener">
+                {t.common.termsOfUse}
+              </a>,
+              <a href="/privacy.html" target="_blank" rel="noopener">
+                {t.common.privacyPolicy}
+              </a>,
+            )}
           </span>
         </label>
       )}
@@ -216,7 +219,7 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
           {error}{' '}
           {notConfirmed && (
             <button type="button" className="link-button" onClick={resend} disabled={busy}>
-              Send the link again
+              {ea.sendAgain}
             </button>
           )}
         </p>
@@ -231,23 +234,23 @@ export function EmailAuth({ onSignedIn }: { onSignedIn: (user: User) => void }) 
           (mode !== 'forgot' && (mode === 'signup' ? password.length < MIN_PASSWORD || !accepted : !password))
         }
       >
-        {busy ? 'One moment…' : action}
+        {busy ? t.common.oneMoment : action}
       </button>
 
       <div className="auth-links">
         {mode === 'signin' && (
           <>
             <button type="button" className="link-button" onClick={() => go('signup')}>
-              Create an account
+              {ea.createAccount}
             </button>
             <button type="button" className="link-button" onClick={() => go('forgot')}>
-              Forgot password?
+              {ea.forgotLink}
             </button>
           </>
         )}
         {mode !== 'signin' && (
           <button type="button" className="link-button" onClick={() => go('signin')}>
-            {mode === 'signup' ? 'I already have an account' : 'Back to sign in'}
+            {mode === 'signup' ? ea.haveAccount : ea.backToSignIn}
           </button>
         )}
       </div>

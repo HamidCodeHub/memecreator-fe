@@ -2,7 +2,9 @@ import { Download, Heart, Pencil } from 'lucide-react'
 import { useState, type CSSProperties } from 'react'
 import { ApiError, type Meme } from './api'
 import { EditMeme } from './EditMeme'
+import { serverText } from './errors'
 import { useFavorites } from './favorites'
+import { useI18n } from './i18n'
 import { ShareMenu } from './ShareMenu'
 
 export function memeFileName(topic: string, index: number, url: string) {
@@ -29,6 +31,7 @@ export function MemeCard({ meme, fileName, style, onEdited, onSignedOut }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const liked = favorites.isFavorite(meme.url)
+  const { t, lang } = useI18n()
 
   async function toggle() {
     if (busy) return
@@ -38,11 +41,15 @@ export function MemeCard({ meme, fileName, style, onEdited, onSignedOut }: {
       await favorites.toggle(meme)
     } catch (e) {
       setError(
-        e instanceof ApiError && e.message
-          ? e.message
-          : liked
-            ? 'Couldn’t remove it. Try again.'
-            : 'Couldn’t save it. Try again.',
+        serverText(
+          e,
+          lang,
+          e instanceof ApiError && e.status === 409
+            ? t.meme.tooManyFavorites
+            : liked
+              ? t.meme.couldntRemove
+              : t.meme.couldntSave,
+        ),
       )
     } finally {
       setBusy(false)
@@ -51,15 +58,15 @@ export function MemeCard({ meme, fileName, style, onEdited, onSignedOut }: {
 
   return (
     <figure className="tile" style={style}>
-      <img src={meme.url} alt={`${meme.template} meme: ${meme.texts.filter(Boolean).join(' / ')}`} />
+      <img src={meme.url} alt={t.meme.alt(meme.template, meme.texts.filter(Boolean).join(' / '))} />
       <figcaption>
         <span className="template-name">{meme.template}</span>
         <div className="tile-actions">
           <button
             type="button"
             className="icon-button"
-            aria-label="Edit the words"
-            title="Edit the words"
+            aria-label={t.meme.edit}
+            title={t.meme.edit}
             aria-haspopup="dialog"
             onClick={() => setEditing(true)}
           >
@@ -69,15 +76,21 @@ export function MemeCard({ meme, fileName, style, onEdited, onSignedOut }: {
             type="button"
             className={`icon-button heart${liked ? ' is-on' : ''}`}
             aria-pressed={liked}
-            aria-label="Favorite"
-            title={liked ? 'Remove from favorites' : 'Add to favorites'}
+            aria-label={t.meme.favorite}
+            title={liked ? t.meme.removeFavorite : t.meme.addFavorite}
             disabled={busy || favorites.items === null}
             onClick={toggle}
           >
             <Heart size={20} aria-hidden="true" fill={liked ? 'currentColor' : 'none'} />
           </button>
           <ShareMenu meme={meme} fileName={fileName} />
-          <a className="icon-button" href={meme.url} download={fileName} aria-label="Download" title="Download">
+          <a
+            className="icon-button"
+            href={meme.url}
+            download={fileName}
+            aria-label={t.common.download}
+            title={t.common.download}
+          >
             <Download size={20} aria-hidden="true" />
           </a>
         </div>

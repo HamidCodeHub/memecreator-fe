@@ -2,6 +2,7 @@ import { Check, LayoutGrid, Search, X } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ApiError, fetchTemplates, type TemplateCard } from './api'
+import { useI18n } from './i18n'
 
 /**
  * "Template: Any (AI picks)" button. It opens a scrolling grid of every template; picking one makes all six memes
@@ -25,6 +26,7 @@ export function TemplatePicker({
   const dialog = useRef<HTMLDialogElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   const id = useId()
+  const { t } = useI18n()
 
   useEffect(() => {
     const d = dialog.current
@@ -67,7 +69,7 @@ export function TemplatePicker({
   return (
     <div className="template-picker">
       <span className="picker-label" id={`${id}-label`}>
-        Template
+        {t.picker.label}
       </span>
       <div className="picker-row">
         <button
@@ -85,15 +87,15 @@ export function TemplatePicker({
             <LayoutGrid size={20} aria-hidden="true" className="picker-thumb picker-thumb-any" />
           )}
           <span id={`${id}-value`} className="picker-value">
-            {value ? value.name : 'Any (the AI picks)'}
+            {value ? value.name : t.picker.any}
           </span>
         </button>
         {value && (
           <button
             type="button"
             className="icon-button"
-            aria-label="Let the AI pick the templates again"
-            title="Let the AI pick"
+            aria-label={t.picker.clear}
+            title={t.picker.clearTitle}
             disabled={disabled}
             onClick={() => onChange(null)}
           >
@@ -117,22 +119,22 @@ export function TemplatePicker({
         >
           <div className="picker-head">
             <h2 id={`${id}-title`} className="dialog-title">
-              Choose a template
+              {t.picker.title}
             </h2>
-            <button type="button" className="icon-button" aria-label="Close" onClick={close}>
+            <button type="button" className="icon-button" aria-label={t.common.close} onClick={close}>
               <X size={20} aria-hidden="true" />
             </button>
           </div>
-          <p className="picker-lede">All six memes will use the template you pick, each with a different joke.</p>
+          <p className="picker-lede">{t.picker.lede}</p>
           <div className="search">
             <label htmlFor={`${id}-search`} className="sr-only">
-              Search templates
+              {t.picker.search}
             </label>
             <Search size={18} aria-hidden="true" className="search-icon" />
             <input
               id={`${id}-search`}
               type="search"
-              placeholder="Search templates"
+              placeholder={t.picker.search}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -140,16 +142,16 @@ export function TemplatePicker({
           <div className="picker-scroll">
             {error && (
               <p className="notice notice-error" role="alert">
-                Couldn’t load the templates.{' '}
+                {t.picker.loadError}{' '}
                 <button type="button" className="link-button" onClick={load}>
-                  Try again
+                  {t.common.tryAgain}
                 </button>
               </p>
             )}
-            {all === null && !error && <p className="empty">Loading templates…</p>}
-            {all && shown.length === 0 && <p className="empty">No template matches “{query.trim()}”.</p>}
+            {all === null && !error && <p className="empty">{t.picker.loading}</p>}
+            {all && shown.length === 0 && <p className="empty">{t.picker.noMatch(query.trim())}</p>}
             {(all !== null || query === '') && (
-              <ul className="picker-grid" aria-label="Templates">
+              <ul className="picker-grid" aria-label={t.picker.list}>
                 {query.trim() === '' && (
                   <li>
                     <button
@@ -161,7 +163,7 @@ export function TemplatePicker({
                       <span className="picker-any-art">
                         <LayoutGrid size={36} aria-hidden="true" />
                       </span>
-                      <span className="picker-option-name">Any (the AI picks)</span>
+                      <span className="picker-option-name">{t.picker.any}</span>
                     </button>
                   </li>
                 )}

@@ -3,16 +3,11 @@ import type { Favorite, User } from './api'
 import { ApiKeysPanel } from './ApiKeysPanel'
 import { DeleteAccount } from './DeleteAccount'
 import { useFavorites } from './favorites'
+import { useI18n } from './i18n'
 import { MemeCard, memeFileName } from './MemeCard'
-import { promptsWord, usePlan } from './plan'
+import { usePlan } from './plan'
 import { followLink } from './router'
 import { Avatar } from './SiteHeader'
-
-const SIGN_IN_METHODS: Record<string, string> = {
-  google: 'Google',
-  facebook: 'Facebook',
-  password: 'email and password',
-}
 
 export function Profile({
   user,
@@ -25,6 +20,8 @@ export function Profile({
 }) {
   const favorites = useFavorites()
   const plan = usePlan(onSignedOut)
+  const { t } = useI18n()
+  const p = t.profile
   // The list as it was when the page opened: un-hearting keeps the meme here (so it can be hearted again)
   const [shown, setShown] = useState<Favorite[] | null>(null)
 
@@ -39,21 +36,20 @@ export function Profile({
 
   return (
     <main className="profile">
-      <section className="profile-head" aria-label="Your account">
+      <section className="profile-head" aria-label={p.yourAccount}>
         <Avatar user={user} size={64} />
         <div>
-          <h1 className="profile-name">{user.name ?? user.email ?? 'Your profile'}</h1>
+          <h1 className="profile-name">{user.name ?? user.email ?? p.yourProfile}</h1>
           <p className="profile-meta">
             {user.email && <span>{user.email}</span>}
-            <span>Signs in with {SIGN_IN_METHODS[user.signInMethod] ?? user.signInMethod}</span>
+            <span>{p.signsIn(p.methods[user.signInMethod] ?? user.signInMethod)}</span>
             {plan && (
               <span>
-                {plan.plan === 'PREMIUM' ? 'Premium plan' : 'Free plan'}
-                {plan.remainingToday !== null &&
-                  ` · ${plan.remainingToday} of ${plan.promptsPerDay} ${promptsWord(plan.promptsPerDay)} left today`}
+                {plan.plan === 'PREMIUM' ? p.premiumPlan : p.freePlan}
+                {plan.remainingToday !== null && ` · ${p.leftToday(plan.remainingToday, plan.promptsPerDay)}`}
                 {' · '}
                 <a href="/premium" onClick={followLink}>
-                  {plan.plan === 'PREMIUM' ? 'Your plan' : 'About Premium'}
+                  {plan.plan === 'PREMIUM' ? p.yourPlan : p.aboutPremium}
                 </a>
               </span>
             )}
@@ -63,23 +59,23 @@ export function Profile({
 
       <section className="profile-section" aria-labelledby="favorites-title">
         <h2 id="favorites-title" className="section-title">
-          Favorites
+          {p.favorites}
           {favorites.items && favorites.items.length > 0 && <span className="count">{favorites.items.length}</span>}
         </h2>
         {favorites.loadError && (
           <p className="notice notice-error" role="alert">
-            Couldn’t load your favorites.{' '}
+            {p.favoritesError}{' '}
             <button type="button" className="link-button" onClick={favorites.reload}>
-              Try again
+              {t.common.tryAgain}
             </button>
           </p>
         )}
         {shown === null && !favorites.loadError && <div className="grid grid-loading" aria-busy="true" />}
         {shown && shown.length === 0 && (
           <div className="empty-state">
-            <p>No favorites yet. Tap the heart under a meme to keep it here.</p>
+            <p>{p.noFavorites}</p>
             <a href="/" className="primary as-link" onClick={followLink}>
-              Make memes
+              {t.header.makeMemes}
             </a>
           </div>
         )}
@@ -104,19 +100,16 @@ export function Profile({
 
       <section className="profile-section" aria-labelledby="api-title">
         <h2 id="api-title" className="section-title">
-          API keys
+          {p.apiKeys}
         </h2>
         <ApiKeysPanel onSignedOut={onSignedOut} />
       </section>
 
       <section className="profile-section danger-zone" aria-labelledby="delete-title">
         <h2 id="delete-title" className="section-title">
-          Delete your account
+          {p.deleteTitle}
         </h2>
-        <p className="section-lede">
-          Deletes your account, your favorites, your API keys, your share links and every meme you made here. This can’t
-          be undone.
-        </p>
+        <p className="section-lede">{p.deleteText}</p>
         <DeleteAccount onDeleted={onDeleted} onSignedOut={onSignedOut} variant="button" />
       </section>
     </main>

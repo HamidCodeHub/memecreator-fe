@@ -1,13 +1,8 @@
 import type { ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import type { PlanInfo } from './api'
-import { promptsWord, resetTime, usePlan } from './plan'
-
-function promptsLine(perDay: number): string {
-  return perDay === 0 ? 'No daily limit on prompts' : `${perDay} ${promptsWord(perDay)} a day`
-}
-
-const SHARED = ['6 memes per prompt', 'Your own photos as templates', 'Edit the words, favorites, sharing']
+import { resetWhen, useI18n } from './i18n'
+import { usePlan } from './plan'
 
 function PlanCard({
   name,
@@ -20,18 +15,20 @@ function PlanCard({
   current: boolean
   children?: ReactNode
 }) {
+  const { t } = useI18n()
+  const p = t.premium
   return (
-    <section className={`plan-card${current ? ' is-current' : ''}`} aria-label={`${name} plan`}>
+    <section className={`plan-card${current ? ' is-current' : ''}`} aria-label={p.planAria(name)}>
       <div className="plan-card-head">
         <h2 className="plan-name">{name}</h2>
-        {current && <span className="plan-badge">Your plan</span>}
+        {current && <span className="plan-badge">{p.yourPlan}</span>}
       </div>
       <ul className="plan-features">
         <li>
           <Check aria-hidden="true" size={18} />
-          <strong>{promptsLine(perDay)}</strong>
+          <strong>{perDay === 0 ? p.noLimit : p.perDay(perDay)}</strong>
         </li>
-        {SHARED.map((f) => (
+        {p.shared.map((f) => (
           <li key={f}>
             <Check aria-hidden="true" size={18} />
             {f}
@@ -44,39 +41,38 @@ function PlanCard({
 }
 
 function Today({ plan }: { plan: PlanInfo }) {
-  if (plan.remainingToday === null) return <p className="section-lede">You have no daily limit.</p>
+  const { t, locale } = useI18n()
+  if (plan.remainingToday === null) return <p className="section-lede">{t.premium.noDailyLimit}</p>
   return (
     <p className="section-lede">
-      Today you’ve used {plan.usedToday} of your {plan.promptsPerDay} {promptsWord(plan.promptsPerDay)}. They
-      come back at {resetTime(plan.resetsAt)}.
+      {t.premium.today(plan.usedToday, plan.promptsPerDay, resetWhen(plan.resetsAt, t, locale))}
     </p>
   )
 }
 
 export function Premium({ onSignedOut }: { onSignedOut: () => void }) {
   const plan = usePlan(onSignedOut)
+  const { t } = useI18n()
+  const p = t.premium
 
   return (
     <main className="page premium">
-      <h1 className="page-title">Premium</h1>
-      <p className="section-lede">
-        Premium gives you more prompts every day. It isn’t on sale yet: Memes for Laughs is in alpha testing with a
-        small group of friends.
-      </p>
+      <h1 className="page-title">{p.title}</h1>
+      <p className="section-lede">{p.lede}</p>
       {plan && <Today plan={plan} />}
 
       {plan === null ? (
         <div className="plan-grid grid-loading" aria-busy="true" />
       ) : (
         <div className="plan-grid">
-          <PlanCard name="Free" perDay={plan.freePromptsPerDay} current={plan.plan === 'FREE'} />
-          <PlanCard name="Premium" perDay={plan.premiumPromptsPerDay} current={plan.plan === 'PREMIUM'}>
+          <PlanCard name={p.free} perDay={plan.freePromptsPerDay} current={plan.plan === 'FREE'} />
+          <PlanCard name={p.premium} perDay={plan.premiumPromptsPerDay} current={plan.plan === 'PREMIUM'}>
             {plan.plan === 'FREE' && (
               <div className="plan-cta">
                 <button type="button" className="primary wide" disabled={!plan.upgradeAvailable}>
-                  {plan.upgradeAvailable ? 'Upgrade to Premium' : 'Coming soon'}
+                  {plan.upgradeAvailable ? p.upgrade : p.soon}
                 </button>
-                {!plan.upgradeAvailable && <p className="plan-note">Payments aren’t open yet.</p>}
+                {!plan.upgradeAvailable && <p className="plan-note">{p.paymentsClosed}</p>}
               </div>
             )}
           </PlanCard>

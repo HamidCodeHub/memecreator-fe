@@ -1,13 +1,8 @@
 import { Check, Copy, KeyRound } from 'lucide-react'
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { ApiError, createApiKey, fetchApiKeys, revokeApiKey, type ApiKeys } from './api'
-
-const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-const time = new Intl.DateTimeFormat(undefined, { timeStyle: 'short' })
-
-function when(iso: string | null) {
-  return iso ? dateTime.format(new Date(iso)) : 'Never'
-}
+import { serverText } from './errors'
+import { useI18n } from './i18n'
 
 /** Personal API keys: create (shown once), list, revoke; today's usage. */
 export function ApiKeysPanel({ onSignedOut }: { onSignedOut: () => void }) {
@@ -20,6 +15,11 @@ export function ApiKeysPanel({ onSignedOut }: { onSignedOut: () => void }) {
   const [copied, setCopied] = useState(false)
   const [confirming, setConfirming] = useState<number | null>(null)
   const ids = { name: useId(), usage: useId() }
+  const { t, lang, locale, captionLanguage } = useI18n()
+  const k = t.apiKeys
+  const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' })
+  const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short' })
+  const when = (iso: string | null) => (iso ? dateTime.format(new Date(iso)) : k.never)
 
   const load = useCallback(() => {
     fetchApiKeys()
@@ -47,7 +47,7 @@ export function ApiKeysPanel({ onSignedOut }: { onSignedOut: () => void }) {
       setName('')
       load()
     } catch (err) {
-      setError(err instanceof ApiError && err.message ? err.message : 'Couldn’t create a key. Try again.')
+      setError(serverText(err, lang, err instanceof ApiError && err.status === 409 ? k.atLimit : k.createFailed))
     } finally {
       setBusy(false)
     }
@@ -61,7 +61,7 @@ export function ApiKeysPanel({ onSignedOut }: { onSignedOut: () => void }) {
       setConfirming(null)
       load()
     } catch {
-      setError('Couldn’t revoke the key. Try again.')
+      setError(k.revokeFailed)
     } finally {
       setBusy(false)
     }
@@ -82,15 +82,13 @@ export function ApiKeysPanel({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <div className="api-keys">
-      <p className="section-lede">
-        Make memes from your own app, bot or script. Send one of your keys in the <code>X-API-Key</code> header.
-      </p>
+      <p className="section-lede">{k.lede(<code>X-API-Key</code>)}</p>
 
       {loadError && (
         <p className="notice notice-error" role="alert">
-          Couldn’t load your API keys.{' '}
+          {k.loadError}{' '}
           <button type="button" className="link-button" onClick={load}>
-            Try again
+            {t.common.tryAgain}
           </button>
         </p>
       )}
@@ -98,10 +96,7 @@ export function ApiKeysPanel({ onSignedOut }: { onSignedOut: () => void }) {
       {data && (
         <div className="usage" aria-labelledby={ids.usage}>
           <p id={ids.usage} className="usage-label">
-            <strong>
-              {data.quota.used} of {data.quota.limit}
-            </strong>{' '}
-            meme sets used today through the API · resets at {time.format(new Date(data.quota.resetsAt))}
+            {k.usage(data.quota.used, data.quota.limit, time.format(new Date(data.quota.resetsAt)))}
           </p>
           <div
             className="meter"
@@ -113,28 +108,25 @@ export function ApiKeysPanel({ onSignedOut }: { onSignedOut: () => void }) {
           >
             <span style={{ width: `${Math.min(100, (data.quota.used / Math.max(1, data.quota.limit)) * 100)}%` }} />
           </div>
-          {data.plan === 'FREE' && <p className="field-hint">Free accounts get {data.quota.limit} sets a day.</p>}
+          {data.plan === 'FREE' && <p className="field-hint">{k.freeHint(data.quota.limit)}</p>}
         </div>
       )}
 
       {newKey && (
         <div className="new-key" role="status">
           <p className="new-key-title">
-            <KeyRound size={18} aria-hidden="true" /> Your new key
+            <KeyRound size={18} aria-hidden="true" /> {k.newKey}
           </p>
           <div className="new-key-row">
             <code className="key-value">{newKey}</code>
             <button type="button" className="quiet" onClick={copyKey}>
               {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? k.copied : k.copy}
             </button>
           </div>
-          <p className="field-hint">
-            Copy it now and keep it somewhere safe. We only show it once; if you lose it, revoke it and create a new
-            one.
-          </p>
+          <p className="field-hint">{k.keepSafe}</p>
           <button type="button" className="link-button" onClick={() => setNewKey(null)}>
-            Done
+            {t.common.done}
           </button>
         </div>
       )}
@@ -142,22 +134,22 @@ export function ApiKeysPanel({ onSignedOut }: { onSignedOut: () => void }) {
       <form className="key-form" onSubmit={create}>
         <div className="field">
           <label htmlFor={ids.name}>
-            Key name <span className="optional">(optional)</span>
+            {k.keyName} <span className="optional">{t.common.optional}</span>
           </label>
           <input
             id={ids.name}
             maxLength={60}
-            placeholder="e.g. My Discord bot"
+            placeholder={k.keyPlaceholder}
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={atLimit}
           />
         </div>
         <button type="submit" className="primary" disabled={busy || data === null || atLimit}>
-          Create key
+          {k.create}
         </button>
       </form>
-      {atLimit && <p className="field-hint">You have 5 keys, the most allowed. Revoke one to create another.</p>}
+      {atLimit && <p className="field-hint">{k.atLimit}</p>}
       {error && (
         <p className="field-error" role="alert">
           {error}
@@ -166,41 +158,41 @@ export function ApiKeysPanel({ onSignedOut }: { onSignedOut: () => void }) {
 
       {data && data.keys.length > 0 && (
         <table className="key-table">
-          <caption className="sr-only">Your API keys</caption>
+          <caption className="sr-only">{k.caption}</caption>
           <thead>
             <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Key</th>
-              <th scope="col">Created</th>
-              <th scope="col">Last used</th>
+              <th scope="col">{k.colName}</th>
+              <th scope="col">{k.colKey}</th>
+              <th scope="col">{k.colCreated}</th>
+              <th scope="col">{k.colLastUsed}</th>
               <th scope="col">
-                <span className="sr-only">Actions</span>
+                <span className="sr-only">{k.colActions}</span>
               </th>
             </tr>
           </thead>
           <tbody>
-            {data.keys.map((k) => (
-              <tr key={k.id}>
-                <td data-label="Name">{k.name}</td>
-                <td data-label="Key">
-                  <code>{k.prefix}…</code>
+            {data.keys.map((key) => (
+              <tr key={key.id}>
+                <td data-label={k.colName}>{key.name}</td>
+                <td data-label={k.colKey}>
+                  <code>{key.prefix}…</code>
                 </td>
-                <td data-label="Created">{when(k.createdAt)}</td>
-                <td data-label="Last used">{when(k.lastUsedAt)}</td>
+                <td data-label={k.colCreated}>{when(key.createdAt)}</td>
+                <td data-label={k.colLastUsed}>{when(key.lastUsedAt)}</td>
                 <td className="key-actions">
-                  {confirming === k.id ? (
+                  {confirming === key.id ? (
                     <span className="confirm">
-                      Revoke this key?{' '}
-                      <button type="button" className="danger small" onClick={() => revoke(k.id)} disabled={busy}>
-                        Revoke
+                      {k.confirmRevoke}{' '}
+                      <button type="button" className="danger small" onClick={() => revoke(key.id)} disabled={busy}>
+                        {k.revoke}
                       </button>{' '}
                       <button type="button" className="quiet small" onClick={() => setConfirming(null)}>
-                        Keep
+                        {k.keep}
                       </button>
                     </span>
                   ) : (
-                    <button type="button" className="quiet small" onClick={() => setConfirming(k.id)}>
-                      Revoke
+                    <button type="button" className="quiet small" onClick={() => setConfirming(key.id)}>
+                      {k.revoke}
                     </button>
                   )}
                 </td>
@@ -209,20 +201,17 @@ export function ApiKeysPanel({ onSignedOut }: { onSignedOut: () => void }) {
           </tbody>
         </table>
       )}
-      {data && data.keys.length === 0 && !newKey && <p className="empty">You don’t have any API keys yet.</p>}
+      {data && data.keys.length === 0 && !newKey && <p className="empty">{k.none}</p>}
 
       <details className="example">
-        <summary>Example request</summary>
+        <summary>{k.example}</summary>
         <pre>
           <code>{`curl -X POST ${origin}/api/v1/memes \\
   -H "X-API-Key: mcu_your_key" \\
   -H "Content-Type: application/json" \\
-  -d '{"topic": "Monday meetings", "language": "English"}'`}</code>
+  -d '{"topic": "${k.exampleTopic}", "language": "${captionLanguage}"}'`}</code>
         </pre>
-        <p className="field-hint">
-          The answer lists 6 memes; download each image from its <code>url</code> with the same header.{' '}
-          <code>GET /api/v1/quota</code> shows what’s left today.
-        </p>
+        <p className="field-hint">{k.exampleHint(<code>url</code>, <code>GET /api/v1/quota</code>)}</p>
       </details>
     </div>
   )

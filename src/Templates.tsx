@@ -1,6 +1,7 @@
 import { Download, Search, Sparkles } from 'lucide-react'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { ApiError, fetchTemplates, type TemplateCard } from './api'
+import { useI18n } from './i18n'
 
 function fileName(t: TemplateCard) {
   const slug = t.name
@@ -20,6 +21,7 @@ export function Templates({ onSignedOut, onUse }: {
   const [error, setError] = useState(false)
   const [query, setQuery] = useState('')
   const searchId = useId()
+  const { t } = useI18n()
 
   function load() {
     setError(false)
@@ -43,23 +45,20 @@ export function Templates({ onSignedOut, onUse }: {
     <main className="page templates-page">
       <div className="page-head">
         <div>
-          <h1 className="page-title">Templates</h1>
+          <h1 className="page-title">{t.templates.title}</h1>
           <p className="section-lede">
-            {all
-              ? `All ${all.length} templates our memes are made from, blank.`
-              : 'The templates our memes are made from.'}{' '}
-            Download any of them to make your own.
+            {all ? t.templates.ledeAll(all.length) : t.templates.ledeNone} {t.templates.ledeDownload}
           </p>
         </div>
         <div className="search">
           <label htmlFor={searchId} className="sr-only">
-            Search templates
+            {t.picker.search}
           </label>
           <Search size={18} aria-hidden="true" className="search-icon" />
           <input
             id={searchId}
             type="search"
-            placeholder="Search templates"
+            placeholder={t.picker.search}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -68,36 +67,36 @@ export function Templates({ onSignedOut, onUse }: {
 
       {error && (
         <p className="notice notice-error" role="alert">
-          Couldn’t load the templates.{' '}
+          {t.picker.loadError}{' '}
           <button type="button" className="link-button" onClick={load}>
-            Try again
+            {t.common.tryAgain}
           </button>
         </p>
       )}
       {all === null && !error && <div className="grid grid-loading" aria-busy="true" />}
-      {all && shown.length === 0 && <p className="empty">No template matches “{query.trim()}”.</p>}
+      {all && shown.length === 0 && <p className="empty">{t.picker.noMatch(query.trim())}</p>}
       {shown.length > 0 && (
-        <ul className="template-grid" aria-label="Templates">
-          {shown.map((t) => (
-            <li key={t.id} className="template-card">
-              <img src={t.url} alt={t.name} loading="lazy" />
+        <ul className="template-grid" aria-label={t.picker.list}>
+          {shown.map((tpl) => (
+            <li key={tpl.id} className="template-card">
+              <img src={tpl.url} alt={tpl.name} loading="lazy" />
               <div className="template-card-foot">
-                <span className="template-name">{t.name}</span>
+                <span className="template-name">{tpl.name}</span>
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label={`Make memes with ${t.name}`}
-                  title="Make memes with it"
-                  onClick={() => onUse(t)}
+                  aria-label={t.templates.use(tpl.name)}
+                  title={t.templates.useTitle}
+                  onClick={() => onUse(tpl)}
                 >
                   <Sparkles size={20} aria-hidden="true" />
                 </button>
                 <a
                   className="icon-button"
-                  href={t.url}
-                  download={fileName(t)}
-                  aria-label={`Download ${t.name}`}
-                  title="Download"
+                  href={tpl.url}
+                  download={fileName(tpl)}
+                  aria-label={t.templates.downloadNamed(tpl.name)}
+                  title={t.common.download}
                 >
                   <Download size={20} aria-hidden="true" />
                 </a>

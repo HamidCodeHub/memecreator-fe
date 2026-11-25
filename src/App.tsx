@@ -3,6 +3,7 @@ import { ApiError, confirmEmail, fetchMe, signOut, type TemplateCard, type User 
 import { Contact } from './Contact'
 import { FavoritesProvider } from './favorites'
 import { Generator } from './Generator'
+import { useI18n } from './i18n'
 import { Premium } from './Premium'
 import { Profile } from './Profile'
 import { ResetPassword } from './ResetPassword'
@@ -31,12 +32,13 @@ function readUrl(): { loginFailed: boolean; link: EmailLink | null } {
 }
 
 export function App() {
+  const { t, lang } = useI18n()
   // undefined = still checking the session
   const [user, setUser] = useState<User | null | undefined>(undefined)
   const [start] = useState(readUrl)
   const [resetToken, setResetToken] = useState<string | null>(start.link?.kind === 'reset' ? start.link.token : null)
   const [notice, setNotice] = useState<Notice | null>(
-    start.loginFailed ? { kind: 'error', text: 'Sign-in didn’t complete. Try again, or use another option.' } : null,
+    start.loginFailed ? { kind: 'error', text: t.app.loginFailed } : null,
   )
   const [loadError, setLoadError] = useState(false)
   const path = usePath()
@@ -50,10 +52,7 @@ export function App() {
       ? confirmEmail(verifyToken).catch(async (e) => {
           setNotice({
             kind: 'error',
-            text:
-              e instanceof ApiError && e.message
-                ? e.message
-                : 'This confirmation link didn’t work. Sign in, or ask for a new link.',
+            text: lang === 'en' && e instanceof ApiError && e.message ? e.message : t.app.badConfirmLink,
           })
           return fetchMe()
         })
@@ -62,6 +61,7 @@ export function App() {
       setLoadError(true)
       setUser(null)
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once; the texts are the ones shown at that moment
   }, [start])
 
   function signedIn(u: User) {
@@ -79,7 +79,7 @@ export function App() {
 
   function accountDeleted() {
     setUser(null)
-    setNotice({ kind: 'info', text: 'Your account and your memes were deleted.' })
+    setNotice({ kind: 'info', text: t.app.deleted })
     navigate('/')
   }
 
@@ -93,7 +93,7 @@ export function App() {
   }
 
   if (user === undefined) {
-    return <div className="boot" aria-busy="true" aria-label="Loading" />
+    return <div className="boot" aria-busy="true" aria-label={t.app.loading} />
   }
 
   let page
@@ -106,7 +106,7 @@ export function App() {
       <>
         {loadError && (
           <p className="notice notice-error banner" role="alert">
-            Can’t reach the Memes for Laughs server. Check that it is running, then reload the page.
+            {t.app.serverDown}
           </p>
         )}
         <SignIn notice={notice} onSignedIn={signedIn} />

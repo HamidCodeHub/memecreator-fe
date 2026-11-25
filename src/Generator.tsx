@@ -1,23 +1,20 @@
-import { useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { ApiError, makeMemes, makePhotoMemes, type MemeSet, type TemplateCard } from './api'
 import { CaptionFrame } from './CaptionFrame'
 import { MemeCard, memeFileName } from './MemeCard'
 import { PhotoAttach, PhotoPreview, photoProblem } from './PhotoAttach'
 import { TemplatePicker } from './TemplatePicker'
-import { planChanged, promptsWord, resetTime, usePlan } from './plan'
+import { serverText } from './errors'
+import { resetWhen, useI18n, type Lang } from './i18n'
+import type { Messages } from './messages'
+import { planChanged, usePlan } from './plan'
 import { followLink } from './router'
 
-const LANGUAGES = [
+/** Languages the captions can be written in (each in its own language) */
+const CAPTION_LANGUAGES = [
   { value: 'English', label: 'English' },
   { value: 'Italian', label: 'Italiano' },
   { value: 'German', label: 'Deutsch' },
-]
-
-const EXAMPLES = [
-  'Monday meetings that could have been an email',
-  'Deploying to production on a Friday',
-  'The gym in January',
-  'Group projects at university',
 ]
 
 const MAX_TOPIC = 300
@@ -29,16 +26,15 @@ type State =
   | { kind: 'done'; set: MemeSet }
   | { kind: 'error'; message: string }
 
-function errorMessage(e: unknown): string {
+function errorMessage(e: unknown, t: Messages, lang: Lang, photo: boolean): string {
   if (e instanceof ApiError) {
-    if (e.status === 429) return e.message || 'You’ve reached the hourly limit. Try again later.'
-    if (e.status === 413) return 'That photo is too big. Choose one under 10 MB.'
-    if (e.status === 400) return e.message || 'That topic can’t be used. Try different words.'
-    if (e.status === 502 || e.status === 503)
-      return e.message || 'The server isn’t responding right now. Please try again later.'
+    if (e.status === 429) return serverText(e, lang, t.generator.hourlyLimit)
+    if (e.status === 413) return t.photo.tooBig
+    if (e.status === 400) return serverText(e, lang, photo ? t.photo.notPhoto : t.generator.badTopic)
+    if (e.status === 502 || e.status === 503) return t.common.aiUnavailable
     if (e.status === 0) return e.message
   }
-  return 'Something went wrong while making your memes. Try again.'
+  return t.generator.failed
 }
 
 export function Generator({
@@ -54,8 +50,11 @@ export function Generator({
   template: TemplateCard | null
   onTemplateChange: (t: TemplateCard | null) => void
 }) {
+  const { t, lang, locale, captionLanguage } = useI18n()
   const [topic, setTopic] = useState('')
-  const [language, setLanguage] = useState('English')
+  // The captions are in the site's language unless the person picks another one (until the site language changes)
+  const [language, setLanguage] = useState(captionLanguage)
+  useEffect(() => setLanguage(captionLanguage), [captionLanguage])
   const [state, setState] = useState<State>({ kind: 'idle' })
   /** "Use your photo": memes are made from it, and the topic becomes optional */
   const [photo, setPhoto] = useState<File | null>(null)
@@ -99,7 +98,7 @@ export function Generator({
         onTermsNeeded()
         return
       }
-      setState({ kind: 'error', message: errorMessage(err) })
+      setState({ kind: 'error', message: errorMessage(err, t, lang, photo !== null) })
     }
   }
 
@@ -126,7 +125,7 @@ export function Generator({
           e.preventDefault()
           setDragging(false)
           const f = e.dataTransfer.files[0]
-          const problem = photoProblem(f)
+          const problem = photoProblem(f, t)
           setPhotoError(problem)
           if (!problem) setPhoto(f)
         }}
@@ -134,10 +133,10 @@ export function Generator({
         <label htmlFor={ids.topic} className="composer-label">
           {photo ? (
             <>
-              What should the memes say about your photo? <span className="optional">(optional)</span>
+              {t.generator.photoLabel} <span className="optional">{t.common.optional}</span>
             </>
           ) : (
-            'What should your memes be about?'
+            t.generator.topicLabel
           )}
         </label>
         <textarea
@@ -147,11 +146,7 @@ export function Generator({
           rows={2}
           maxLength={MAX_TOPIC}
           value={topic}
-          placeholder={
-            photo
-              ? 'Leave it empty and the AI decides what’s funny about your photo'
-              : 'e.g. My cat ignoring me until I open the fridge'
-          }
+          placeholder={photo ? t.generator.photoPlaceholder : t.generator.topicPlaceholder}
           aria-describedby={ids.hint}
           onChange={(e) => setTopic(e.target.value)}
           onKeyDown={(e) => {
@@ -168,9 +163,9 @@ export function Generator({
           )}
           <PhotoAttach photo={photo} onChange={setPhoto} onError={setPhotoError} disabled={loading} />
           <div className="field-inline">
-            <label htmlFor={ids.language}>Caption language</label>
+            <label htmlFor={ids.language}>{t.generator.captionLanguage}</label>
             <select id={ids.language} value={language} onChange={(e) => setLanguage(e.target.value)}>
-              {LANGUAGES.map((l) => (
+              {CAPTION_LANGUAGES.map((l) => (
                 <option key={l.value} value={l.value}>
                   {l.label}
                 </option>
@@ -181,7 +176,7 @@ export function Generator({
             {topic.length}/{MAX_TOPIC}
           </span>
           <button type="submit" className="primary" disabled={(!trimmed && !photo) || loading || outOfPrompts}>
-            {loading ? 'Making memes…' : state.kind === 'done' ? 'Make 6 new memes' : 'Make 6 memes'}
+            {loading ? t.generator.making : state.kind === 'done' ? t.generator.makeNew : t.generator.make}
           </button>
         </div>
 
@@ -193,10 +188,10 @@ export function Generator({
 
         {plan && promptsLeft !== null && !outOfPrompts && (
           <p className="prompts-left">
-            {promptsLeft} of {plan.promptsPerDay} {promptsWord(plan.promptsPerDay)} left today.{' '}
+            {t.generator.promptsLeft(promptsLeft, plan.promptsPerDay)}{' '}
             {plan.plan === 'FREE' && (
               <a href="/premium" onClick={followLink}>
-                Need more?
+                {t.generator.needMore}
               </a>
             )}
           </p>
@@ -204,8 +199,8 @@ export function Generator({
 
         {state.kind !== 'done' && !loading && !photo && !outOfPrompts && (
           <div className="examples">
-            <span>Try:</span>
-            {EXAMPLES.map((ex) => (
+            <span>{t.generator.tryLabel}</span>
+            {t.generator.examples.map((ex) => (
               <button key={ex} type="button" className="chip" onClick={() => pickExample(ex)}>
                 {ex}
               </button>
@@ -217,11 +212,11 @@ export function Generator({
       <p className={`status${state.kind === 'done' ? ' sr-only' : ''}`} role="status" aria-live="polite">
         {loading &&
           (photo
-            ? 'Looking at your photo and writing captions. This usually takes 10–30 seconds.'
+            ? t.generator.loadingPhoto
             : template
-              ? `Writing six jokes on “${template.name}”. This usually takes 10–30 seconds.`
-              : 'Writing captions and picking templates. This usually takes 10–30 seconds.')}
-        {state.kind === 'done' && `${state.set.memes.length} memes ready.`}
+              ? t.generator.loadingTemplate(template.name)
+              : t.generator.loadingAny)}
+        {state.kind === 'done' && t.generator.ready(state.set.memes.length)}
       </p>
 
       {state.kind === 'error' && (
@@ -233,15 +228,15 @@ export function Generator({
       {plan && outOfPrompts && !loading && (
         <section className="limit-card" role="status" aria-labelledby="limit-title">
           <h2 id="limit-title" className="limit-title">
-            That’s your {plan.promptsPerDay} {promptsWord(plan.promptsPerDay)} for today
+            {t.generator.limitTitle(plan.promptsPerDay)}
           </h2>
           <p className="limit-text">
-            They come back at {resetTime(plan.resetsAt)}.
-            {plan.plan === 'FREE' && ' Premium will give you more every day.'}
+            {t.generator.limitBack(resetWhen(plan.resetsAt, t, locale))}
+            {plan.plan === 'FREE' && ` ${t.generator.premiumMore}`}
           </p>
           {plan.plan === 'FREE' && (
             <a href="/premium" className="primary as-link" onClick={followLink}>
-              See Premium
+              {t.generator.seePremium}
             </a>
           )}
         </section>
@@ -252,14 +247,14 @@ export function Generator({
       {(state.kind === 'idle' || state.kind === 'error') && !photo && !outOfPrompts && (
         <CaptionFrame
           className="frame-preview"
-          top={trimmed || 'Your topic goes here'}
+          top={trimmed || t.generator.frameTop}
           placeholder={!trimmed}
-          bottom="Get six memes"
+          bottom={t.generator.frameBottom}
         />
       )}
 
       {loading && (
-        <section className="grid" aria-label="Memes on the way" aria-busy="true">
+        <section className="grid" aria-label={t.generator.onTheWay} aria-busy="true">
           {Array.from({ length: SET_SIZE }, (_, i) => (
             <div key={i} className="tile tile-pending" style={{ animationDelay: `${i * 120}ms` }} />
           ))}
@@ -269,11 +264,11 @@ export function Generator({
       {state.kind === 'done' && (
         <section ref={resultsRef} tabIndex={-1} className="results" aria-labelledby="results-title">
           <h2 id="results-title" className="results-title">
-            {state.set.topic ? <>Memes about “{state.set.topic}”</> : 'Memes from your photo'}
+            {state.set.topic ? t.generator.resultsAbout(state.set.topic) : t.generator.resultsPhoto}
           </h2>
           {state.set.memes.length < SET_SIZE && (
             <p className="results-note">
-              {state.set.memes.length} of {SET_SIZE} came out this time. Make a new set to get more.
+              {t.generator.partial(state.set.memes.length, SET_SIZE)}
             </p>
           )}
           <div className="grid">

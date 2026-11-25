@@ -1,5 +1,7 @@
 import { useId, useState, type FormEvent } from 'react'
-import { ApiError, resetPassword, type User } from './api'
+import { resetPassword, type User } from './api'
+import { serverText } from './errors'
+import { useI18n } from './i18n'
 
 const MIN_PASSWORD = 10
 
@@ -18,6 +20,7 @@ export function ResetPassword({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const ids = { password: useId(), hint: useId() }
+  const { t, lang } = useI18n()
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -27,7 +30,7 @@ export function ResetPassword({
     try {
       onSignedIn(await resetPassword(token, password))
     } catch (err) {
-      setError(err instanceof ApiError && err.message ? err.message : 'That didn’t work. Ask for a new link.')
+      setError(serverText(err, lang, t.reset.failed))
     } finally {
       setBusy(false)
     }
@@ -37,12 +40,12 @@ export function ResetPassword({
     <main className="reset">
       <form className="reset-card" onSubmit={submit} noValidate>
         <h1 className="brand">Memes for Laughs</h1>
-        <p className="auth-title">Choose a new password</p>
+        <p className="auth-title">{t.reset.title}</p>
         <div className="field">
           <div className="field-head">
-            <label htmlFor={ids.password}>New password</label>
+            <label htmlFor={ids.password}>{t.reset.newPassword}</label>
             <button type="button" className="link-button small" aria-pressed={show} onClick={() => setShow((v) => !v)}>
-              {show ? 'Hide' : 'Show'}
+              {show ? t.common.hide : t.common.show}
             </button>
           </div>
           <input
@@ -56,7 +59,7 @@ export function ResetPassword({
             onChange={(e) => setPassword(e.target.value)}
           />
           <p id={ids.hint} className="field-hint">
-            At least {MIN_PASSWORD} characters.
+            {t.reset.hint(MIN_PASSWORD)}
           </p>
         </div>
         {error && (
@@ -65,11 +68,11 @@ export function ResetPassword({
           </p>
         )}
         <button type="submit" className="primary wide" disabled={busy || password.length < MIN_PASSWORD}>
-          {busy ? 'One moment…' : 'Save password and sign in'}
+          {busy ? t.common.oneMoment : t.reset.save}
         </button>
         <div className="auth-links">
           <button type="button" className="link-button" onClick={onCancel}>
-            Back to sign in
+            {t.emailAuth.backToSignIn}
           </button>
         </div>
       </form>

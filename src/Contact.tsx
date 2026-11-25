@@ -1,6 +1,8 @@
 import { Send } from 'lucide-react'
 import { useId, useState, type FormEvent } from 'react'
 import { ApiError, sendContact, type User } from './api'
+import { serverText } from './errors'
+import { useI18n } from './i18n'
 
 const MAX_MESSAGE = 5000
 
@@ -14,6 +16,8 @@ export function Contact({ user }: { user: User | null }) {
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState<string | null>(null)
   const ids = { email: useId(), subject: useId(), message: useId(), count: useId(), website: useId() }
+  const { t, lang } = useI18n()
+  const c = t.contact
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -22,14 +26,16 @@ export function Contact({ user }: { user: User | null }) {
     setError(null)
     try {
       const res = await sendContact(email.trim(), subject.trim(), message.trim(), website)
-      setSent(res.message)
+      setSent(lang === 'en' && res.message ? res.message : c.sent(email.trim()))
       setSubject('')
       setMessage('')
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) {
-        setError('Check your email address, and write a subject and a message.')
+        setError(c.invalid)
+      } else if (err instanceof ApiError && err.status === 429) {
+        setError(serverText(err, lang, c.tooMany))
       } else {
-        setError(err instanceof ApiError && err.message ? err.message : 'Your message wasn’t sent. Try again.')
+        setError(serverText(err, lang, c.failed))
       }
     } finally {
       setBusy(false)
@@ -38,53 +44,51 @@ export function Contact({ user }: { user: User | null }) {
 
   return (
     <main className="page contact-page">
-      <h1 className="page-title">Contact us</h1>
-      <p className="section-lede">
-        A question, an idea, a meme that went wrong? Write to us and we’ll answer by email.
-      </p>
+      <h1 className="page-title">{c.title}</h1>
+      <p className="section-lede">{c.lede}</p>
 
       {sent ? (
         <div className="sent-panel" role="status">
           <p>{sent}</p>
           <button type="button" className="quiet" onClick={() => setSent(null)}>
-            Send another message
+            {c.sendAnother}
           </button>
         </div>
       ) : (
         <form className="contact-form" onSubmit={submit} noValidate={false}>
           <div className="field">
-            <label htmlFor={ids.email}>Your email</label>
+            <label htmlFor={ids.email}>{c.yourEmail}</label>
             <input
               id={ids.email}
               type="email"
               autoComplete="email"
               required
               maxLength={320}
-              placeholder="you@example.com"
+              placeholder={c.emailPlaceholder}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
           <div className="field">
-            <label htmlFor={ids.subject}>Subject</label>
+            <label htmlFor={ids.subject}>{c.subject}</label>
             <input
               id={ids.subject}
               required
               maxLength={150}
-              placeholder="What is it about?"
+              placeholder={c.subjectPlaceholder}
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
             />
           </div>
           <div className="field">
-            <label htmlFor={ids.message}>Message</label>
+            <label htmlFor={ids.message}>{c.message}</label>
             <textarea
               id={ids.message}
               required
               minLength={5}
               maxLength={MAX_MESSAGE}
               rows={8}
-              placeholder="Write your message here"
+              placeholder={c.messagePlaceholder}
               aria-describedby={ids.count}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -114,10 +118,10 @@ export function Contact({ user }: { user: User | null }) {
             disabled={busy || !email.trim() || !subject.trim() || message.trim().length < 5}
           >
             <Send size={18} aria-hidden="true" />
-            {busy ? 'Sending…' : 'Send message'}
+            {busy ? c.sending : c.send}
           </button>
           <p className="fine-print">
-            We use your email only to answer you. See the <a href="/privacy.html">Privacy policy</a>.
+            {c.privacy(<a href="/privacy.html">{t.common.privacyPolicy}</a>)}
           </p>
         </form>
       )}

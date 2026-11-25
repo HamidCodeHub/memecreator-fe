@@ -1,13 +1,15 @@
 import { ImagePlus, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
+import { useI18n } from './i18n'
+import type { Messages } from './messages'
 
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024
 const TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/webp']
 
 /** Checks a chosen or dropped file; returns an error message, or null when it can be used. */
-export function photoProblem(file: File): string | null {
-  if (!TYPES.includes(file.type)) return 'That file isn’t a photo. Choose a JPEG or PNG image.'
-  if (file.size > MAX_PHOTO_BYTES) return 'That photo is too big. Choose one under 10 MB.'
+export function photoProblem(file: File, t: Messages): string | null {
+  if (!TYPES.includes(file.type)) return t.photo.notPhoto
+  if (file.size > MAX_PHOTO_BYTES) return t.photo.tooBig
   return null
 }
 
@@ -26,6 +28,7 @@ export function PhotoAttach({
   const input = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const id = useId()
+  const { t } = useI18n()
 
   useEffect(() => {
     if (!photo) {
@@ -41,7 +44,7 @@ export function PhotoAttach({
     const f = files?.[0]
     if (input.current) input.current.value = '' // choosing the same file again still fires
     if (!f) return
-    const problem = photoProblem(f)
+    const problem = photoProblem(f, t)
     onError(problem)
     if (!problem) onChange(f)
   }
@@ -65,8 +68,8 @@ export function PhotoAttach({
           <button
             type="button"
             className="icon-button"
-            aria-label="Remove the photo"
-            title="Remove the photo"
+            aria-label={t.photo.remove}
+            title={t.photo.remove}
             disabled={disabled}
             onClick={() => {
               onChange(null)
@@ -79,7 +82,7 @@ export function PhotoAttach({
       ) : (
         <button type="button" className="picker-button" disabled={disabled} onClick={() => input.current?.click()}>
           <ImagePlus size={20} aria-hidden="true" className="picker-thumb picker-thumb-any" />
-          <span className="picker-value">Use your photo</span>
+          <span className="picker-value">{t.photo.use}</span>
         </button>
       )}
     </div>
@@ -89,6 +92,7 @@ export function PhotoAttach({
 /** The chosen photo, shown where the sample meme frame usually is. */
 export function PhotoPreview({ photo }: { photo: File }) {
   const [url, setUrl] = useState<string | null>(null)
+  const { t } = useI18n()
   useEffect(() => {
     const u = URL.createObjectURL(photo)
     setUrl(u)
@@ -96,8 +100,8 @@ export function PhotoPreview({ photo }: { photo: File }) {
   }, [photo])
   return url ? (
     <figure className="photo-preview">
-      <img src={url} alt="Your photo" />
-      <figcaption>Six memes will be made from this photo.</figcaption>
+      <img src={url} alt={t.photo.alt} />
+      <figcaption>{t.photo.caption}</figcaption>
     </figure>
   ) : null
 }
